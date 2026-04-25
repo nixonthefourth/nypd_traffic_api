@@ -4,6 +4,10 @@ from datetime import date
 
 # Base Model
 class DriverBase(BaseModel):
+    email: str
+    username: str
+    user_password: str
+    phone_number: str
     licence_number: str
     state_issue: str
     last_name: str
@@ -31,6 +35,10 @@ class AddressCreate(BaseModel):
 # Insert New Driver
 class DriverCreate(BaseModel):
     address: AddressCreate
+    email: str
+    username: str
+    user_password: str
+    phone_number: str
     licence_number: str
     state_issue: str
     last_name: str

@@ -28,14 +28,18 @@ async def get_driver_details(driver_id: int):
     # Driver Details
     driver = {
         "driver_id": row[0],
-        "licence_number": row[2],
-        "state_issue": row[3],
-        "last_name": row[4],
-        "first_name": row[5],
-        "dob": row[6],
-        "height_inches": row[7],
-        "weight_pounds": row[8],
-        "eyes_colour": row[9]
+        "email": row[2],
+        "username": row[3],
+        "user_password": row[4],
+        "phone_number": row[5],
+        "licence_number": row[6],
+        "state_issue": row[7],
+        "last_name": row[8],
+        "first_name": row[9],
+        "dob": row[10],
+        "height_inches": row[11],
+        "weight_pounds": row[12],
+        "eyes_colour": row[13]
     }
 
     # Return the Results
@@ -45,21 +49,33 @@ async def get_driver_details(driver_id: int):
 @drivers_router.get("", status_code=status.HTTP_200_OK)
 async def get_all_drivers():
     # Perform the Operation
-    row = fetch_all_drivers()
+    rows = fetch_all_drivers()  # Changed from 'row' to 'rows'
 
     # Validation
-    if row is None:
-        raise HTTPException(status_code=404, detail="Driver ID Not Found")
+    if rows is None or len(rows) == 0:
+        raise HTTPException(status_code=404, detail="No drivers found")
     
-    # All Drivers
-    drivers = {
-        "driver_id": row[0],
-        "state_issue": row[1],
-        "last_name": row[2],
-        "first_name": row[3]
-    }
+    # Build list of all drivers
+    drivers = []
+    for row in rows:  # Loop through each driver
+        driver = {
+            "driver_id": row[0],
+            "email": row[2],
+            "username": row[3],
+            "user_password": row[4],
+            "phone_number": row[5],
+            "licence_number": row[6],
+            "state_issue": row[7],
+            "last_name": row[8],
+            "first_name": row[9],
+            "dob": str(row[10]),
+            "height_inches": row[11],
+            "weight_pounds": row[12],
+            "eyes_colour": row[13]
+        }
+        drivers.append(driver)
 
-    # Return
+    # Return list of drivers
     return drivers
 
 """POST"""
@@ -79,6 +95,10 @@ async def insert_new_driver(
 
     return DriverOut(
         driver_id=driver_id,
+        email=payload.email,
+        username=payload.username,
+        user_password=payload.user_password,
+        phone_number=payload.phone_number,
         licence_number=payload.licence_number,
         state_issue=payload.state_issue,
         last_name=payload.last_name,
@@ -129,13 +149,17 @@ async def update_existing_driver(
         )
 
     return {
-        "driver_id": row[0],
-        "licence_number": row[1],
-        "state_issue": row[2],
-        "last_name": row[3],
-        "first_name": row[4],
-        "dob": row[5],
-        "height_inches": row[6],
-        "weight_pounds": row[7],
-        "eyes_colour": row[8]
-    }
+    "driver_id": row[0],        
+    "email": row[2],            
+    "username": row[3],         
+    "user_password": row[4],    
+    "phone_number": row[5],     
+    "licence_number": row[6],   
+    "state_issue": row[7],      
+    "last_name": row[8],        
+    "first_name": row[9],       
+    "dob": row[10],             
+    "height_inches": row[11],   
+    "weight_pounds": row[12],   
+    "eyes_colour": row[13]    
+}

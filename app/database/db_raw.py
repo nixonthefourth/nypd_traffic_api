@@ -9,7 +9,7 @@ def get_connection():
         host = "localhost",
         port = 3306,
         user = "root",
-        password = "SEPS",
+        password = "0777",
         db = "notice_base",
         charset="utf8mb4"
     )
@@ -82,7 +82,7 @@ def fetch_all_drivers():
 
     # Query
     query = """
-    SELECT driver_id, state_issue, last_name, first_name
+    SELECT *
     FROM driver_details
     """
 
@@ -138,6 +138,10 @@ def create_driver(driver, address):
             """
             INSERT INTO driver_details (
                 address_id,
+                email,
+                username,
+                user_password,
+                phone_number,
                 licence_number,
                 state_issue,
                 last_name,
@@ -147,10 +151,14 @@ def create_driver(driver, address):
                 weight_pounds,
                 eyes_colour
             )
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             """,
             (
                 address_id,
+                driver.email,
+                driver.username,
+                driver.user_password,
+                driver.phone_number,
                 driver.licence_number,
                 driver.state_issue,
                 driver.last_name,
@@ -467,7 +475,12 @@ def update_driver(driver_id: int, payload):
         cursor.execute(
             """
             UPDATE driver_details
-            SET licence_number = %s,
+            SET 
+                email = %s,
+                username = %s,
+                user_password = %s,
+                phone_number = %s,
+                licence_number = %s,
                 state_issue = %s,
                 last_name = %s,
                 first_name = %s,
@@ -478,6 +491,10 @@ def update_driver(driver_id: int, payload):
             WHERE driver_id = %s
             """,
             (
+                payload.email,
+                payload.username,
+                payload.user_password,
+                payload.phone_number,
                 payload.licence_number,
                 payload.state_issue,
                 payload.last_name,
@@ -495,9 +512,9 @@ def update_driver(driver_id: int, payload):
         # Return Updated Row
         cursor.execute(
             """
-            SELECT driver_id, licence_number, state_issue,
-                   last_name, first_name, dob,
-                   height_inches, weight_pounds, eyes_colour
+            SELECT driver_id, address_id, email, username, user_password, phone_number,
+                    licence_number, state_issue, last_name, first_name, dob,
+                    height_inches, weight_pounds, eyes_colour
             FROM driver_details
             WHERE driver_id = %s
             """,

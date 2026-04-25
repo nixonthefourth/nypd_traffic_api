@@ -5,13 +5,6 @@ USE notice_base;
 # Officer Account
 CREATE USER IF NOT EXISTS  'officer_user'@'localhost' IDENTIFIED BY 'officer_password';
 
-# Drivers' Account
-CREATE USER IF NOT EXISTS  'driver_1_user'@'localhost' IDENTIFIED BY 'driver_1_password';
-CREATE USER IF NOT EXISTS  'driver_2_user'@'localhost' IDENTIFIED BY 'driver_2_password';
-CREATE USER IF NOT EXISTS  'driver_3_user'@'localhost' IDENTIFIED BY 'driver_3_password';
-CREATE USER IF NOT EXISTS  'driver_4_user'@'localhost' IDENTIFIED BY 'driver_4_password';
-CREATE USER IF NOT EXISTS  'driver_5_user'@'localhost' IDENTIFIED BY 'driver_5_password';
-
 # Person's ZIP Code
 # Accepts both ZIP and ZIP+4 standards
 CREATE TABLE reg_zip_code (
@@ -36,7 +29,11 @@ CREATE TABLE reg_address (
 # Person's details from perspective of a Driver
 CREATE TABLE driver_details (
 	driver_id INT AUTO_INCREMENT NOT NULL,
-    address_id INT NOT NULL,
+    address_id INT NOT NULL, 
+    email VARCHAR(60) NOT NULL, # New Field
+    username VARCHAR(60) NOT NULL, # New Field
+    user_password VARCHAR(70) NOT NULL, # New Field
+    phone_number VARCHAR(15) NOT NULL, # New Field
     licence_number VARCHAR(20) NOT NULL,
     state_issue VARCHAR(40) NOT NULL,
     last_name VARCHAR(100) NOT NULL,
@@ -48,11 +45,7 @@ CREATE TABLE driver_details (
     
     PRIMARY KEY (driver_id),
     FOREIGN KEY (address_id) REFERENCES reg_address(address_id) ON DELETE RESTRICT ON UPDATE RESTRICT,
-    
-    # Logical age check
-    # Driver must be at least 16 years old
-    CHECK (dob <= DATE_SUB('2025-11-11', INTERVAL 16 YEAR)),
-    
+
     # Logical height range
     CHECK (height_inches >= 36 AND height_inches <= 96),
     
@@ -78,7 +71,7 @@ CREATE TABLE car_details (
     FOREIGN KEY (address_id) REFERENCES reg_address (address_id) ON DELETE RESTRICT ON UPDATE RESTRICT,
     
     # Car can't be from the future
-    CHECK (year_production <= '2025'),
+    CHECK (year_production <= 2026),
     
     # Car must be reasonably old
     CHECK (year_production >= 1900)
@@ -155,186 +148,6 @@ CREATE TABLE actions (
 # Officer's Full Access
 GRANT ALL PRIVILEGES ON notice_base.* TO 'officer_user'@'localhost';
 
-# Driver 1 Limited Access
-CREATE VIEW driver_1_view AS
-SELECT 
-    driver_details.driver_id,
-    driver_details.first_name,
-    driver_details.last_name,
-    car_details.licence_plate,
-    car_details.make,
-    car_details.car_type,
-    car_details.year_production,
-    car_details.plate_state_issue,
-    car_details.vin,
-    car_details.colour,
-    notice_info.notice_id,
-    notice_info.violation_description,
-    notice_info.violation_severity,
-    notice_info.notice_status,
-    notice_info.violation_date_time,
-    reg_zip_code.state AS reg_state,
-    reg_zip_code.city AS reg_city,
-    violation_zip_code.state AS violation_state,
-    violation_zip_code.city AS violation_city,
-    violation_zip_code.district AS violation_district,
-    violation_address.street AS violation_street
-FROM driver_details
-JOIN car_details ON driver_details.driver_id = car_details.driver_id
-JOIN notice_info ON car_details.car_id = notice_info.car_id
-JOIN reg_address ON driver_details.address_id = reg_address.address_id
-JOIN reg_zip_code ON reg_address.zip_code = reg_zip_code.zip_code
-JOIN violation_address ON notice_info.address_id = violation_address.address_id
-JOIN violation_zip_code ON violation_address.zip_code = violation_zip_code.zip_code
-WHERE driver_details.driver_id = 1;
-
-# Grant Access
-GRANT SELECT ON notice_base.driver_1_view TO 'driver_1_user'@'localhost';
-
-# Driver 2 Limited Access
-CREATE VIEW driver_2_view AS
-SELECT 
-    driver_details.driver_id,
-    driver_details.first_name,
-    driver_details.last_name,
-    car_details.licence_plate,
-    car_details.make,
-    car_details.car_type,
-    car_details.year_production,
-    car_details.plate_state_issue,
-    car_details.vin,
-    car_details.colour,
-    notice_info.notice_id,
-    notice_info.violation_description,
-    notice_info.violation_severity,
-    notice_info.notice_status,
-    notice_info.violation_date_time,
-    reg_zip_code.state AS reg_state,
-    reg_zip_code.city AS reg_city,
-    violation_zip_code.state AS violation_state,
-    violation_zip_code.city AS violation_city,
-    violation_zip_code.district AS violation_district,
-    violation_address.street AS violation_street
-FROM driver_details
-JOIN car_details ON driver_details.driver_id = car_details.driver_id
-JOIN notice_info ON car_details.car_id = notice_info.car_id
-JOIN reg_address ON driver_details.address_id = reg_address.address_id
-JOIN reg_zip_code ON reg_address.zip_code = reg_zip_code.zip_code
-JOIN violation_address ON notice_info.address_id = violation_address.address_id
-JOIN violation_zip_code ON violation_address.zip_code = violation_zip_code.zip_code
-WHERE driver_details.driver_id = 2;
-
-# Grant Access
-GRANT SELECT ON notice_base.driver_2_view TO 'driver_2_user'@'localhost';
-
-# Driver 3 Limited Access
-CREATE VIEW driver_3_view AS
-SELECT 
-    driver_details.driver_id,
-    driver_details.first_name,
-    driver_details.last_name,
-    car_details.licence_plate,
-    car_details.make,
-    car_details.car_type,
-    car_details.year_production,
-    car_details.plate_state_issue,
-    car_details.vin,
-    car_details.colour,
-    notice_info.notice_id,
-    notice_info.violation_description,
-    notice_info.violation_severity,
-    notice_info.notice_status,
-    notice_info.violation_date_time,
-    reg_zip_code.state AS reg_state,
-    reg_zip_code.city AS reg_city,
-    violation_zip_code.state AS violation_state,
-    violation_zip_code.city AS violation_city,
-    violation_zip_code.district AS violation_district,
-    violation_address.street AS violation_street
-FROM driver_details
-JOIN car_details ON driver_details.driver_id = car_details.driver_id
-JOIN notice_info ON car_details.car_id = notice_info.car_id
-JOIN reg_address ON driver_details.address_id = reg_address.address_id
-JOIN reg_zip_code ON reg_address.zip_code = reg_zip_code.zip_code
-JOIN violation_address ON notice_info.address_id = violation_address.address_id
-JOIN violation_zip_code ON violation_address.zip_code = violation_zip_code.zip_code
-WHERE driver_details.driver_id = 3;
-
-# Grant Access
-GRANT SELECT ON notice_base.driver_3_view TO 'driver_3_user'@'localhost';
-
-# Driver 4 Limited Access
-CREATE VIEW driver_4_view AS
-SELECT 
-    driver_details.driver_id,
-    driver_details.first_name,
-    driver_details.last_name,
-    car_details.licence_plate,
-    car_details.make,
-    car_details.car_type,
-    car_details.year_production,
-    car_details.plate_state_issue,
-    car_details.vin,
-    car_details.colour,
-    notice_info.notice_id,
-    notice_info.violation_description,
-    notice_info.violation_severity,
-    notice_info.notice_status,
-    notice_info.violation_date_time,
-    reg_zip_code.state AS reg_state,
-    reg_zip_code.city AS reg_city,
-    violation_zip_code.state AS violation_state,
-    violation_zip_code.city AS violation_city,
-    violation_zip_code.district AS violation_district,
-    violation_address.street AS violation_street
-FROM driver_details
-JOIN car_details ON driver_details.driver_id = car_details.driver_id
-JOIN notice_info ON car_details.car_id = notice_info.car_id
-JOIN reg_address ON driver_details.address_id = reg_address.address_id
-JOIN reg_zip_code ON reg_address.zip_code = reg_zip_code.zip_code
-JOIN violation_address ON notice_info.address_id = violation_address.address_id
-JOIN violation_zip_code ON violation_address.zip_code = violation_zip_code.zip_code
-WHERE driver_details.driver_id = 4;
-
-# Grant Access
-GRANT SELECT ON notice_base.driver_4_view TO 'driver_4_user'@'localhost';
-
-# Driver 5 Limited Access
-CREATE VIEW driver_5_view AS
-SELECT 
-    driver_details.driver_id,
-    driver_details.first_name,
-    driver_details.last_name,
-    car_details.licence_plate,
-    car_details.make,
-    car_details.car_type,
-    car_details.year_production,
-    car_details.plate_state_issue,
-    car_details.vin,
-    car_details.colour,
-    notice_info.notice_id,
-    notice_info.violation_description,
-    notice_info.violation_severity,
-    notice_info.notice_status,
-    notice_info.violation_date_time,
-    reg_zip_code.state AS reg_state,
-    reg_zip_code.city AS reg_city,
-    violation_zip_code.state AS violation_state,
-    violation_zip_code.city AS violation_city,
-    violation_zip_code.district AS violation_district,
-    violation_address.street AS violation_street
-FROM driver_details
-JOIN car_details ON driver_details.driver_id = car_details.driver_id
-JOIN notice_info ON car_details.car_id = notice_info.car_id
-JOIN reg_address ON driver_details.address_id = reg_address.address_id
-JOIN reg_zip_code ON reg_address.zip_code = reg_zip_code.zip_code
-JOIN violation_address ON notice_info.address_id = violation_address.address_id
-JOIN violation_zip_code ON violation_address.zip_code = violation_zip_code.zip_code
-WHERE driver_details.driver_id = 5;
-
-# Grant Access
-GRANT SELECT ON notice_base.driver_5_view TO 'driver_5_user'@'localhost';
-
 # Commit Privileges
 FLUSH PRIVILEGES;
 
@@ -355,11 +168,12 @@ VALUES (
 );
 
 INSERT INTO driver_details (
-    address_id, licence_number, state_issue, last_name, first_name, dob,
+    address_id, email, username, user_password, phone_number, licence_number, state_issue, last_name, first_name, dob,
     height_inches, weight_pounds, eyes_colour
 )
 VALUES (
-    1, 'NY1234567', 'New York', 'Doe', 'John', '1990-05-29',
+    1, 'johndoe@gmail.com', 'john_doe', '007jd', '07455890052',
+    'NY1234567', 'New York', 'Doe', 'John', '1990-05-29',
     72, 154, 'Blue'
 );
 
@@ -425,11 +239,11 @@ VALUES (
 );
 
 INSERT INTO driver_details (
-    address_id, licence_number, state_issue, last_name, first_name, dob,
+    address_id, email, username, user_password, phone_number, licence_number, state_issue, last_name, first_name, dob,
     height_inches, weight_pounds, eyes_colour
 )
 VALUES (
-    2, 'NY2234567', 'New York', 'Nicholas', 'Kevin', '1963-11-22',
+    2, 'kevnicks@gmail.com', 'kevnicks', '0098', '08988763321', 'NY2234567', 'New York', 'Nicholas', 'Kevin', '1963-11-22',
     70, 180, 'Green'
 );
 
@@ -488,11 +302,12 @@ VALUES (
 );
 
 INSERT INTO driver_details (
-    address_id, licence_number, state_issue, last_name, first_name, dob,
+    address_id, email, username, user_password, phone_number, licence_number, state_issue, last_name, first_name, dob,
     height_inches, weight_pounds, eyes_colour
 )
 VALUES (
-    3, 'NY2334567', 'New York', 'Michaels', 'Larry', '2000-08-22',
+    3, 'lmich@outlook.com', 'l_michs', '909009LM', '093833891183', 'NY2334567',
+    'New York', 'Michaels', 'Larry', '2000-08-22',
     63, 130, 'Brown'
 );
 
@@ -572,11 +387,12 @@ VALUES (
 );
 
 INSERT INTO driver_details (
-    address_id, licence_number, state_issue, last_name, first_name, dob,
+    address_id, email, username, user_password, phone_number, licence_number, state_issue, last_name, first_name, dob,
     height_inches, weight_pounds, eyes_colour
 )
 VALUES (
-    4, 'CA2334567', 'California', 'Samsa', 'Gregor', '1970-09-22',
+    4, 'samsamail@gmail.com', 'bugger', 'sam0987', '73736353635',
+    'CA2334567', 'California', 'Samsa', 'Gregor', '1970-09-22',
     69, 153, 'Blue'
 );
 
@@ -656,11 +472,12 @@ VALUES (
 );
 
 INSERT INTO driver_details (
-    address_id, licence_number, state_issue, last_name, first_name, dob,
+    address_id, email, username, user_password, phone_number, licence_number, state_issue, last_name, first_name, dob,
     height_inches, weight_pounds, eyes_colour
 )
 VALUES (
-    5, 'NJ2334567', 'New Jersey', 'Samsa', 'Gregor', '1970-09-22',
+    5, 'myemail@gmail.com', 'beetle', 'franzkafka', '08000372282',
+    'NJ2334567', 'New Jersey', 'Samsa', 'Gregor', '1970-09-22',
     69, 153, 'Blue'
 );
 
@@ -702,181 +519,3 @@ INSERT INTO actions (
 VALUES (
 	'A005', 'N005', 'B003', 'Warning'
 );
-
-# DML Queries
-# Administrative Officer Queries
-# Find all drivers from Los Angeles
-SELECT
-    driver_details.driver_id,
-    driver_details.first_name,
-    driver_details.last_name,
-    reg_zip_code.city,
-    reg_zip_code.state,
-    reg_zip_code.zip_code,
-    reg_address.address_id,
-    reg_address.street
-FROM driver_details
-INNER JOIN reg_address
-    ON driver_details.address_id = reg_address.address_id
-INNER JOIN reg_zip_code
-    ON reg_address.zip_code = reg_zip_code.zip_code
-WHERE reg_zip_code.city = 'Los Angeles';
-
-# Find all drivers and their violations
-SELECT 
-    driver_details.driver_id,
-    driver_details.first_name,
-    driver_details.last_name,
-    car_details.licence_plate,
-    notice_info.notice_id,
-    notice_info.violation_description,
-    notice_info.notice_status
-FROM driver_details
-LEFT JOIN car_details ON driver_details.driver_id = car_details.driver_id
-LEFT JOIN notice_info ON car_details.car_id = notice_info.car_id;
-
-# List all violations with officer actions
-SELECT 
-    notice_info.notice_id,
-    notice_info.violation_description,
-    notice_info.violation_severity,
-    violation_zip_code.city,
-    violation_address.street,
-    officer_info.first_name,
-    officer_info.last_name,
-    actions.action_type
-FROM notice_info
-INNER JOIN violation_address ON notice_info.address_id = violation_address.address_id
-INNER JOIN violation_zip_code ON violation_address.zip_code = violation_zip_code.zip_code
-LEFT JOIN actions ON notice_info.notice_id = actions.notice_id
-LEFT JOIN officer_info ON actions.badge_number = officer_info.badge_number;
-
-# Get all cars and their violations with driver info
-SELECT 
-    car_details.car_id,
-    car_details.make,
-    car_details.year_production,
-    car_details.licence_plate,
-    driver_details.first_name,
-    driver_details.last_name,
-    reg_zip_code.city,
-    notice_info.violation_description,
-    notice_info.violation_severity
-FROM car_details
-INNER JOIN driver_details ON car_details.driver_id = driver_details.driver_id
-INNER JOIN reg_address ON driver_details.address_id = reg_address.address_id
-INNER JOIN reg_zip_code ON reg_address.zip_code = reg_zip_code.zip_code
-LEFT JOIN notice_info ON car_details.car_id = notice_info.car_id;
-
-# Find all violation locations and associated notices
-SELECT 
-    violation_zip_code.city,
-    violation_zip_code.district,
-    violation_address.street,
-    notice_info.notice_id,
-    notice_info.violation_description,
-    driver_details.first_name,
-    driver_details.last_name,
-    car_details.make
-FROM notice_info
-RIGHT JOIN violation_address ON notice_info.address_id = violation_address.address_id
-INNER JOIN violation_zip_code ON violation_address.zip_code = violation_zip_code.zip_code
-LEFT JOIN car_details ON notice_info.car_id = car_details.car_id
-LEFT JOIN driver_details ON car_details.driver_id = driver_details.driver_id;
-
-# List all high severity violations with complete details
-SELECT 
-    notice_info.notice_id,
-    notice_info.violation_date_time,
-    driver_details.first_name,
-    driver_details.last_name,
-    car_details.make,
-    car_details.licence_plate,
-    violation_zip_code.district,
-    actions.action_type,
-    officer_info.first_name,
-    officer_info.last_name
-FROM notice_info
-INNER JOIN car_details ON notice_info.car_id = car_details.car_id
-INNER JOIN driver_details ON car_details.driver_id = driver_details.driver_id
-INNER JOIN violation_address ON notice_info.address_id = violation_address.address_id
-INNER JOIN violation_zip_code ON violation_address.zip_code = violation_zip_code.zip_code
-LEFT JOIN actions ON notice_info.notice_id = actions.notice_id
-LEFT JOIN officer_info ON actions.badge_number = officer_info.badge_number
-WHERE notice_info.violation_severity = 'High';
-
-# Get all drivers with their cars and registration addresses
-SELECT 
-    driver_details.driver_id,
-    driver_details.first_name,
-    driver_details.last_name,
-    driver_details.licence_number,
-    reg_zip_code.city,
-    reg_zip_code.state,
-    reg_address.street,
-    car_details.make,
-    car_details.licence_plate
-FROM driver_details
-LEFT JOIN reg_address ON driver_details.address_id = reg_address.address_id
-LEFT JOIN reg_zip_code ON reg_address.zip_code = reg_zip_code.zip_code
-LEFT JOIN car_details ON driver_details.driver_id = car_details.driver_id;
-
-# Find all actions taken with full violation context
-SELECT 
-    actions.action_id,
-    actions.action_type,
-    officer_info.first_name,
-    officer_info.last_name,
-    notice_info.violation_description,
-    notice_info.violation_severity,
-    driver_details.first_name,
-    driver_details.last_name,
-    violation_zip_code.city,
-    violation_address.street
-FROM actions
-INNER JOIN officer_info ON actions.badge_number = officer_info.badge_number
-LEFT JOIN notice_info ON actions.notice_id = notice_info.notice_id
-LEFT JOIN car_details ON notice_info.car_id = car_details.car_id
-LEFT JOIN driver_details ON car_details.driver_id = driver_details.driver_id
-LEFT JOIN violation_address ON notice_info.address_id = violation_address.address_id
-LEFT JOIN violation_zip_code ON violation_address.zip_code = violation_zip_code.zip_code;
-
-# Compare driver registration location with violation location
-SELECT 
-    notice_info.notice_id,
-    notice_info.violation_date_time,
-    driver_details.first_name,
-    driver_details.last_name,
-    reg_zip_code.city,
-    reg_zip_code.state,
-    violation_zip_code.city,
-    violation_zip_code.state,
-    violation_zip_code.district,
-    car_details.make,
-    notice_info.violation_description
-FROM driver_details
-INNER JOIN car_details ON driver_details.driver_id = car_details.driver_id
-RIGHT JOIN notice_info ON car_details.car_id = notice_info.car_id
-INNER JOIN violation_address ON notice_info.address_id = violation_address.address_id
-INNER JOIN violation_zip_code ON violation_address.zip_code = violation_zip_code.zip_code
-LEFT JOIN reg_address ON driver_details.address_id = reg_address.address_id
-LEFT JOIN reg_zip_code ON reg_address.zip_code = reg_zip_code.zip_code;
-
-# Citizen Queries
-# Check violations that occurred outside his home state
-SELECT 
-    driver_4_view.notice_id,
-    driver_4_view.violation_description,
-    driver_4_view.violation_severity,
-    driver_4_view.licence_plate,
-    driver_4_view.make,
-    driver_4_view.reg_state,
-    driver_4_view.reg_city,
-    driver_4_view.violation_state,
-    driver_4_view.violation_city,
-    driver_4_view.violation_district,
-    driver_4_view.violation_street,
-    driver_4_view.violation_date_time
-FROM driver_4_view
-WHERE driver_4_view.reg_state != driver_4_view.violation_state
-    AND driver_4_view.notice_id IS NOT NULL;
