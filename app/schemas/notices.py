@@ -26,6 +26,11 @@ class NoticeBase(BaseModel):
     expiry_date: date
     violation_description: str
 
+# Notice shown to civilians with vehicle and location context
+class CivilianNotice(NoticeBase):
+    car: str
+    address: str
+
 # Notice Create Model
 class NoticeCreate(NoticeBase):
     car_id: int

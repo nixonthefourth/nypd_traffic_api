@@ -18,6 +18,46 @@ def get_connection():
 
 """GET"""
 
+# Get Civilian Account by Username or Email
+def fetch_civilian_by_login(login: str):
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    query = """
+    SELECT driver_id, address_id, email, username, user_password, phone_number,
+           licence_number, state_issue, last_name, first_name, dob,
+           height_inches, weight_pounds, eyes_colour
+    FROM driver_details
+    WHERE username = %s OR email = %s
+    """
+
+    cursor.execute(query, (login, login))
+    row = cursor.fetchone()
+
+    cursor.close()
+    conn.close()
+
+    return row
+
+# Check if Civilian Login Details Are Already Registered
+def civilian_account_exists(username: str, email: str, licence_number: str):
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    query = """
+    SELECT username, email, licence_number
+    FROM driver_details
+    WHERE username = %s OR email = %s OR licence_number = %s
+    """
+
+    cursor.execute(query, (username, email, licence_number))
+    row = cursor.fetchone()
+
+    cursor.close()
+    conn.close()
+
+    return row
+
 # Get Driver's Details by ID
 def fetch_driver_details(driver_id: int):
     # Open SQL Connection
@@ -57,22 +97,53 @@ def fetch_driver_notices(driver_id: int):
     """
 
     query = """
-    SELECT *
+    SELECT
+        notice_info.notice_id,
+        notice_info.violation_date_time,
+        notice_info.detachment,
+        notice_info.violation_severity,
+        notice_info.notice_status,
+        notice_info.notification_sent,
+        notice_info.entry_date,
+        notice_info.expiry_date,
+        notice_info.violation_description,
+        CONCAT(
+            car_details.year_production,
+            ' ',
+            car_details.make,
+            ' ',
+            car_details.car_type,
+            ' (',
+            car_details.licence_plate,
+            ')'
+        ) AS car,
+        CONCAT(
+            violation_address.street,
+            ', ',
+            violation_zip_code.city,
+            ', ',
+            violation_zip_code.state,
+            ' ',
+            violation_zip_code.zip_code
+        ) AS address
     FROM notice_info
     JOIN car_details ON notice_info.car_id = car_details.car_id
+    JOIN violation_address ON notice_info.address_id = violation_address.address_id
+    JOIN violation_zip_code ON violation_address.zip_code = violation_zip_code.zip_code
     WHERE car_details.driver_id = %s
+    ORDER BY notice_info.violation_date_time DESC
     """
 
     # Execute Query
     cursor.execute(query, (driver_id,))
-    row = cursor.fetchone()
+    rows = cursor.fetchall()
 
     # Close Connection
     cursor.close()
     conn.close()
 
     # Output Results
-    return row
+    return rows
 
 # Get All Drivers
 def fetch_all_drivers():
@@ -98,6 +169,93 @@ def fetch_all_drivers():
     return row
 
 """POST"""
+
+# Register a New Civilian Driver Account
+def create_civilian_account(civilian, hashed_password: str):
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    try:
+        cursor.execute(
+            "SELECT 1 FROM reg_zip_code WHERE zip_code = %s",
+            (civilian.address.zip_code,)
+        )
+
+        if cursor.fetchone() is None:
+            cursor.execute(
+                """
+                INSERT INTO reg_zip_code (zip_code, state, city)
+                VALUES (%s, %s, %s)
+                """,
+                (
+                    civilian.address.zip_code,
+                    civilian.address.state,
+                    civilian.address.city
+                )
+            )
+
+        cursor.execute(
+            """
+            INSERT INTO reg_address (zip_code, street, house)
+            VALUES (%s, %s, %s)
+            """,
+            (
+                civilian.address.zip_code,
+                civilian.address.street,
+                civilian.address.house
+            )
+        )
+
+        address_id = cursor.lastrowid
+
+        cursor.execute(
+            """
+            INSERT INTO driver_details (
+                address_id,
+                email,
+                username,
+                user_password,
+                phone_number,
+                licence_number,
+                state_issue,
+                last_name,
+                first_name,
+                dob,
+                height_inches,
+                weight_pounds,
+                eyes_colour
+            )
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            """,
+            (
+                address_id,
+                civilian.email,
+                civilian.username,
+                hashed_password,
+                civilian.phone_number,
+                civilian.licence_number,
+                civilian.state_issue,
+                civilian.last_name,
+                civilian.first_name,
+                civilian.dob,
+                civilian.height_inches,
+                civilian.weight_pounds,
+                civilian.eyes_colour
+            )
+        )
+
+        driver_id = cursor.lastrowid
+        conn.commit()
+
+        return driver_id
+
+    except Exception:
+        conn.rollback()
+        raise
+
+    finally:
+        cursor.close()
+        conn.close()
 
 # Create a New Driver
 def create_driver(driver, address):
@@ -414,6 +572,31 @@ def delete_driver(driver_id: int):
         conn.close()
 
 """PUT"""
+
+# Store a New Civilian Password Hash
+def update_civilian_password(driver_id: int, hashed_password: str):
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    try:
+        cursor.execute(
+            """
+            UPDATE driver_details
+            SET user_password = %s
+            WHERE driver_id = %s
+            """,
+            (hashed_password, driver_id)
+        )
+
+        conn.commit()
+
+    except Exception:
+        conn.rollback()
+        raise
+
+    finally:
+        cursor.close()
+        conn.close()
 
 # Update Driver (Full PUT) and return updated row
 def update_driver(driver_id: int, payload):

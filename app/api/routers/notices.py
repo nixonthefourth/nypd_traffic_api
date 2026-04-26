@@ -2,6 +2,7 @@
 # Imports
 from fastapi import HTTPException, APIRouter, status, Depends
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from typing import List
 from app.database.db_raw import *
 from app.schemas.notices import *
 from app.core.security import verify_token
@@ -16,30 +17,39 @@ security = HTTPBearer()
 """GET"""
 
 # Get Driver's Notice Details by ID
-@notices_router.get("/{driver_id}", response_model=NoticeBase, status_code=status.HTTP_200_OK)
-async def get_driver_notice(driver_id: int):
-    # Perform the Operation
-    row = fetch_driver_notices(driver_id)
+@notices_router.get("/{driver_id}", response_model=List[CivilianNotice], status_code=status.HTTP_200_OK)
+async def get_driver_notice(
+    driver_id: int,
+    credentials: HTTPAuthorizationCredentials = Depends(security)
+):
+    token_payload = verify_token(credentials.credentials)
 
-    # Validation
-    if row is None:
-        raise HTTPException(status_code=404, detail="Driver ID Not Found")
-    
+    if token_payload.get("role") == "civilian" and token_payload.get("driver_id") != driver_id:
+        raise HTTPException(status_code=403, detail="Cannot access another driver's notices")
+
+    # Perform the Operation
+    rows = fetch_driver_notices(driver_id)
+
     # Notice Details
-    notice = {
-        "notice_id": row[0],
-        "violation_date_time": row[3],
-        "detachment": row[4],
-        "violation_severity": row[5],
-        "notice_status": row[6],
-        "notification_sent": row[7],
-        "entry_date": row[8],
-        "expiry_date": row[9],
-        "violation_description": row[10]
-    }
+    notices = []
+
+    for row in rows:
+        notices.append({
+            "notice_id": row[0],
+            "violation_date_time": row[1],
+            "detachment": row[2],
+            "violation_severity": row[3],
+            "notice_status": row[4],
+            "notification_sent": row[5],
+            "entry_date": row[6],
+            "expiry_date": row[7],
+            "violation_description": row[8],
+            "car": row[9],
+            "address": row[10]
+        })
 
     # Return the Results
-    return notice
+    return notices
 
 """POST"""
 
