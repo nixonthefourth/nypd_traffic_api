@@ -36,6 +36,34 @@ def dashboard_notice_from_row(row):
     }
 
 
+def admin_notice_from_row(row):
+    return {
+        "notice_id": row[0],
+        "car_id": row[1],
+        "violation_date_time": row[2],
+        "detachment": row[3],
+        "violation_severity": row[4],
+        "notice_status": row[5],
+        "notification_sent": row[6],
+        "entry_date": row[7],
+        "expiry_date": row[8],
+        "violation_description": row[9],
+        "driver": row[10],
+        "licence_number": row[11],
+        "car": row[12],
+        "vin": row[13],
+        "licence_plate": row[14],
+        "address": row[15],
+        "street": row[16],
+        "zip_code": row[17],
+        "city": row[18],
+        "state": row[19],
+        "district": row[20],
+        "officer": row[21],
+        "badge_number": row[22]
+    }
+
+
 @notices_router.get("/admin/dashboard", response_model=AdminDashboardStats, status_code=status.HTTP_200_OK)
 async def get_admin_dashboard_stats(
     district: str | None = Query(default=None),
@@ -69,6 +97,16 @@ async def get_admin_dashboard_stats(
             dashboard_notice_from_row(row) for row in stats["notices"]
         ]
     }
+
+
+@notices_router.get("/admin", response_model=List[AdminNotice], status_code=status.HTTP_200_OK)
+async def get_admin_notices(
+    credentials: HTTPAuthorizationCredentials = Depends(security)
+):
+    require_admin(verify_token(credentials.credentials))
+    rows = fetch_admin_notices()
+
+    return [admin_notice_from_row(row) for row in rows]
 
 
 # Get Driver's Notice Details by ID
@@ -109,14 +147,21 @@ async def get_driver_notice(
 """POST"""
 
 # Create New Notice
-@notices_router.post("", response_model=NoticeBase, status_code=status.HTTP_200_OK)
+@notices_router.post("", response_model=AdminNotice, status_code=status.HTTP_200_OK)
 async def insert_new_notice(
     notice: NoticeCreate,
     credentials: HTTPAuthorizationCredentials = Depends(security)
 ):
-    require_admin(verify_token(credentials.credentials))
+    token_payload = require_admin(verify_token(credentials.credentials))
+    badge_number = token_payload.get("badge_number")
 
-    notice_id = create_notice(notice, notice.violation_zip, notice.violation_address)
+    if badge_number is None:
+        raise HTTPException(status_code=403, detail="Admin badge is required")
+
+    try:
+        notice_id = create_notice(notice, notice.violation_zip, notice.violation_address)
+    except ValueError as error:
+        raise HTTPException(status_code=404, detail=str(error))
 
     if notice_id is None:
         raise HTTPException(
@@ -124,17 +169,10 @@ async def insert_new_notice(
             detail="Car does not exist. Cannot issue notice."
         )
 
-    return {
-        "notice_id": notice.notice_id,
-        "violation_date_time": notice.violation_date_time,
-        "detachment": notice.detachment,
-        "violation_severity": notice.violation_severity,
-        "notice_status": notice.notice_status,
-        "notification_sent": notice.notification_sent,
-        "entry_date": notice.entry_date,
-        "expiry_date": notice.expiry_date,
-        "violation_description": notice.violation_description
-    }
+    create_notice_action(notice_id, badge_number)
+    row = fetch_admin_notice(notice_id)
+
+    return admin_notice_from_row(row)
 
 """DELETE"""
 
@@ -159,7 +197,7 @@ async def remove_notice(
 """PUT"""
 
 # Fully Updates Notice Details
-@notices_router.put("/{notice_id}", response_model=NoticeBase, status_code=status.HTTP_201_CREATED)
+@notices_router.put("/{notice_id}", response_model=AdminNotice, status_code=status.HTTP_201_CREATED)
 async def update_existing_notice(
     notice_id: str,
     payload: NoticeCreate,
@@ -167,22 +205,14 @@ async def update_existing_notice(
 ):
     require_admin(verify_token(credentials.credentials))
 
-    row = update_notice(notice_id, payload)
+    updated_notice = update_notice(notice_id, payload)
 
-    if row is None:
+    if updated_notice is None:
         raise HTTPException(
             status_code=404,
             detail="Notice not found"
         )
 
-    return {
-        "notice_id": row[0],
-        "violation_date_time": row[1],
-        "detachment": row[2],
-        "violation_severity": row[3],
-        "notice_status": row[4],
-        "notification_sent": row[5],
-        "entry_date": row[6],
-        "expiry_date": row[7],
-        "violation_description": row[8]
-    }
+    row = fetch_admin_notice(notice_id)
+
+    return admin_notice_from_row(row)

@@ -55,6 +55,23 @@ class DashboardNotice(BaseModel):
     violation_description: str
 
 
+class AdminNotice(NoticeBase):
+    car_id: int
+    driver: str
+    licence_number: str
+    car: str
+    vin: str
+    licence_plate: str
+    address: str
+    street: str
+    zip_code: str
+    city: str
+    state: str
+    district: str
+    officer: str | None = None
+    badge_number: str | None = None
+
+
 class AdminDashboardStats(BaseModel):
     overview: DashboardOverview
     violation_counts: List[DashboardCount]

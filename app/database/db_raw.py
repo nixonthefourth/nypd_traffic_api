@@ -318,6 +318,132 @@ def fetch_admin_dashboard_stats(badge_number: str, district=None, sort_order: st
         cursor.close()
         conn.close()
 
+
+# Get All Notices for Admin Citation Management
+def fetch_admin_notices():
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    query = """
+    SELECT
+        notice_info.notice_id,
+        notice_info.car_id,
+        notice_info.violation_date_time,
+        notice_info.detachment,
+        notice_info.violation_severity,
+        notice_info.notice_status,
+        notice_info.notification_sent,
+        notice_info.entry_date,
+        notice_info.expiry_date,
+        notice_info.violation_description,
+        CONCAT(driver_details.first_name, ' ', driver_details.last_name) AS driver,
+        driver_details.licence_number,
+        CONCAT(
+            car_details.year_production,
+            ' ',
+            car_details.make,
+            ' ',
+            car_details.car_type
+        ) AS car,
+        car_details.vin,
+        car_details.licence_plate,
+        CONCAT(
+            violation_address.street,
+            ', ',
+            violation_zip_code.city,
+            ', ',
+            violation_zip_code.state,
+            ' ',
+            violation_zip_code.zip_code
+        ) AS address,
+        violation_address.street,
+        violation_zip_code.zip_code,
+        violation_zip_code.city,
+        violation_zip_code.state,
+        violation_zip_code.district,
+        CONCAT(officer_info.first_name, ' ', officer_info.last_name) AS officer,
+        actions.badge_number
+    FROM notice_info
+    JOIN car_details ON notice_info.car_id = car_details.car_id
+    JOIN driver_details ON car_details.driver_id = driver_details.driver_id
+    JOIN violation_address ON notice_info.address_id = violation_address.address_id
+    JOIN violation_zip_code ON violation_address.zip_code = violation_zip_code.zip_code
+    LEFT JOIN actions ON notice_info.notice_id = actions.notice_id
+    LEFT JOIN officer_info ON actions.badge_number = officer_info.badge_number
+    ORDER BY notice_info.violation_date_time DESC
+    """
+
+    cursor.execute(query)
+    rows = cursor.fetchall()
+
+    cursor.close()
+    conn.close()
+
+    return rows
+
+
+# Get One Notice for Admin Citation Management
+def fetch_admin_notice(notice_id: str):
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    query = """
+    SELECT
+        notice_info.notice_id,
+        notice_info.car_id,
+        notice_info.violation_date_time,
+        notice_info.detachment,
+        notice_info.violation_severity,
+        notice_info.notice_status,
+        notice_info.notification_sent,
+        notice_info.entry_date,
+        notice_info.expiry_date,
+        notice_info.violation_description,
+        CONCAT(driver_details.first_name, ' ', driver_details.last_name) AS driver,
+        driver_details.licence_number,
+        CONCAT(
+            car_details.year_production,
+            ' ',
+            car_details.make,
+            ' ',
+            car_details.car_type
+        ) AS car,
+        car_details.vin,
+        car_details.licence_plate,
+        CONCAT(
+            violation_address.street,
+            ', ',
+            violation_zip_code.city,
+            ', ',
+            violation_zip_code.state,
+            ' ',
+            violation_zip_code.zip_code
+        ) AS address,
+        violation_address.street,
+        violation_zip_code.zip_code,
+        violation_zip_code.city,
+        violation_zip_code.state,
+        violation_zip_code.district,
+        CONCAT(officer_info.first_name, ' ', officer_info.last_name) AS officer,
+        actions.badge_number
+    FROM notice_info
+    JOIN car_details ON notice_info.car_id = car_details.car_id
+    JOIN driver_details ON car_details.driver_id = driver_details.driver_id
+    JOIN violation_address ON notice_info.address_id = violation_address.address_id
+    JOIN violation_zip_code ON violation_address.zip_code = violation_zip_code.zip_code
+    LEFT JOIN actions ON notice_info.notice_id = actions.notice_id
+    LEFT JOIN officer_info ON actions.badge_number = officer_info.badge_number
+    WHERE notice_info.notice_id = %s
+    """
+
+    cursor.execute(query, (notice_id,))
+    row = cursor.fetchone()
+
+    cursor.close()
+    conn.close()
+
+    return row
+
 # Get All Drivers
 def fetch_all_drivers():
     # Open an SQL Bridge
@@ -620,6 +746,36 @@ def create_notice(notice, violation_zip, violation_address):
         raise
 
     # Final Leg of the Journey
+    finally:
+        cursor.close()
+        conn.close()
+
+
+# Link Notice to the Admin Officer Who Created It
+def create_notice_action(notice_id: str, badge_number: str):
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    try:
+        cursor.execute(
+            """
+            INSERT INTO actions (action_id, notice_id, badge_number, action_type)
+            VALUES (%s, %s, %s, %s)
+            """,
+            (
+                f"A-{notice_id}-{badge_number}",
+                notice_id,
+                badge_number,
+                "Created"
+            )
+        )
+
+        conn.commit()
+
+    except Exception:
+        conn.rollback()
+        raise
+
     finally:
         cursor.close()
         conn.close()
