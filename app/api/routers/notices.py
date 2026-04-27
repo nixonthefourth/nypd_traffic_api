@@ -1,11 +1,11 @@
 # app/api/routers/notices.py
 # Imports
-from fastapi import HTTPException, APIRouter, status, Depends
+from fastapi import HTTPException, APIRouter, status, Depends, Query
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from typing import List
 from app.database.db_raw import *
 from app.schemas.notices import *
-from app.core.security import verify_token
+from app.core.security import require_admin, verify_token
 
 # Defines the Router
 notices_router = APIRouter(
@@ -15,6 +15,61 @@ tags=["Notices"])
 security = HTTPBearer()
 
 """GET"""
+
+
+def dashboard_count_from_row(row):
+    return {
+        "label": row[0],
+        "count": row[1]
+    }
+
+
+def dashboard_notice_from_row(row):
+    return {
+        "notice_id": row[0],
+        "violation_date_time": row[1],
+        "detachment": row[2],
+        "district": row[3],
+        "violation_severity": row[4],
+        "notice_status": row[5],
+        "violation_description": row[6]
+    }
+
+
+@notices_router.get("/admin/dashboard", response_model=AdminDashboardStats, status_code=status.HTTP_200_OK)
+async def get_admin_dashboard_stats(
+    district: str | None = Query(default=None),
+    sort_order: str = Query(default="desc", pattern="^(asc|desc)$"),
+    credentials: HTTPAuthorizationCredentials = Depends(security)
+):
+    token_payload = require_admin(verify_token(credentials.credentials))
+    badge_number = token_payload.get("badge_number")
+
+    if badge_number is None:
+        raise HTTPException(status_code=403, detail="Admin badge is required")
+
+    stats = fetch_admin_dashboard_stats(
+        badge_number=badge_number,
+        district=district,
+        sort_order=sort_order
+    )
+
+    return {
+        "overview": stats["overview"],
+        "violation_counts": [
+            dashboard_count_from_row(row) for row in stats["violation_counts"]
+        ],
+        "district_counts": [
+            dashboard_count_from_row(row) for row in stats["district_counts"]
+        ],
+        "detachment_counts": [
+            dashboard_count_from_row(row) for row in stats["detachment_counts"]
+        ],
+        "notices": [
+            dashboard_notice_from_row(row) for row in stats["notices"]
+        ]
+    }
+
 
 # Get Driver's Notice Details by ID
 @notices_router.get("/{driver_id}", response_model=List[CivilianNotice], status_code=status.HTTP_200_OK)
@@ -59,7 +114,7 @@ async def insert_new_notice(
     notice: NoticeCreate,
     credentials: HTTPAuthorizationCredentials = Depends(security)
 ):
-    verify_token(credentials.credentials)
+    require_admin(verify_token(credentials.credentials))
 
     notice_id = create_notice(notice, notice.violation_zip, notice.violation_address)
 
@@ -89,7 +144,7 @@ async def remove_notice(
     notice_id: str,
     credentials: HTTPAuthorizationCredentials = Depends(security)
 ):
-    verify_token(credentials.credentials)
+    require_admin(verify_token(credentials.credentials))
 
     deleted = delete_notice(notice_id)
 
@@ -110,7 +165,7 @@ async def update_existing_notice(
     payload: NoticeCreate,
     credentials: HTTPAuthorizationCredentials = Depends(security)
 ):
-    verify_token(credentials.credentials)
+    require_admin(verify_token(credentials.credentials))
 
     row = update_notice(notice_id, payload)
 

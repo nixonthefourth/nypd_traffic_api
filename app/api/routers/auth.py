@@ -2,6 +2,9 @@ from fastapi import APIRouter, HTTPException, Depends
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from passlib.exc import UnknownHashError
 from app.schemas.auth import (
+    AdminLoginRequest,
+    AdminTokenResponse,
+    CivilianContactUpdateRequest,
     CivilianRegisterRequest,
     CivilianResponse,
     CivilianTokenResponse,
@@ -37,23 +40,67 @@ def civilian_response_from_row(row):
         "eyes_colour": row[13]
     }
 
+
+def admin_response_from_row(row, username, token):
+    return {
+        "access_token": token,
+        "token_type": "bearer",
+        "role": "admin",
+        "badge_number": row[0],
+        "username": username,
+        "last_name": row[1],
+        "first_name": row[2]
+    }
+
+
+def validate_admin_credentials(username: str, password: str):
+    return username == "officer_user" and password == "officer_password"
+
+
+def require_civilian_payload(token: str):
+    payload = verify_token(token)
+
+    if payload.get("role") != "civilian" or payload.get("driver_id") is None:
+        raise HTTPException(status_code=403, detail="Civilian access required")
+
+    return payload
+
 # POST
 @auth_router.post("", response_model=TokenResponse)
 def login(data: LoginRequest):
 
-    valid_users = {
-        "officer_user"
-    }
-
-    valid_passwords = {
-        "officer_password"
-    }
-
-    if data.username not in valid_users or data.password not in valid_passwords:
+    if not validate_admin_credentials(data.username, data.password):
         raise HTTPException(status_code=401, detail="Invalid credentials")
 
-    token = create_access_token({"sub": data.username})
-    return {"access_token": token, "token_type": "bearer"}
+    token = create_access_token({
+        "sub": data.username,
+        "role": "admin"
+    })
+
+    return {
+        "access_token": token,
+        "token_type": "bearer",
+        "role": "admin"
+    }
+
+
+@auth_router.post("/admin/login", response_model=AdminTokenResponse)
+def login_admin(data: AdminLoginRequest):
+    if not validate_admin_credentials(data.username, data.password):
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+
+    officer = fetch_officer_by_badge(data.badge_number)
+
+    if officer is None:
+        raise HTTPException(status_code=401, detail="Invalid badge number")
+
+    token = create_access_token({
+        "sub": data.username,
+        "role": "admin",
+        "badge_number": officer[0]
+    })
+
+    return admin_response_from_row(officer, data.username, token)
 
 
 @auth_router.post("/civilian/register", response_model=CivilianResponse, status_code=201)
@@ -118,8 +165,23 @@ def login_civilian(data: LoginRequest):
     return {
         "access_token": token,
         "token_type": "bearer",
+        "role": "civilian",
         "driver_id": driver_id
     }
+
+# GET
+
+@auth_router.get("/civilian/me", response_model=CivilianResponse)
+def get_civilian_profile(
+    credentials: HTTPAuthorizationCredentials = Depends(security)
+):
+    payload = require_civilian_payload(credentials.credentials)
+    row = fetch_driver_details(payload["driver_id"])
+
+    if row is None:
+        raise HTTPException(status_code=404, detail="Civilian profile not found")
+
+    return civilian_response_from_row(row)
 
 # PUT
 
@@ -130,9 +192,41 @@ def refresh_token(
     old_token = credentials.credentials
     payload = verify_token(old_token)
 
-    new_token = create_access_token({"sub": payload["sub"]})
+    refresh_payload = {
+        key: value for key, value in payload.items()
+        if key not in {"exp", "jti"}
+    }
 
-    return {"access_token": new_token, "token_type": "bearer"}
+    new_token = create_access_token(refresh_payload)
+
+    return {
+        "access_token": new_token,
+        "token_type": "bearer",
+        "role": payload.get("role", "admin")
+    }
+
+
+@auth_router.put("/civilian/me", response_model=CivilianResponse)
+def update_civilian_contact(
+    data: CivilianContactUpdateRequest,
+    credentials: HTTPAuthorizationCredentials = Depends(security)
+):
+    payload = require_civilian_payload(credentials.credentials)
+    driver_id = payload["driver_id"]
+
+    if civilian_email_taken_by_other(data.email, driver_id):
+        raise HTTPException(status_code=409, detail="Email is already registered")
+
+    row = update_civilian_contact_details(
+        driver_id=driver_id,
+        email=data.email,
+        phone_number=data.phone_number
+    )
+
+    if row is None:
+        raise HTTPException(status_code=404, detail="Civilian profile not found")
+
+    return civilian_response_from_row(row)
 
 # DELETE
 

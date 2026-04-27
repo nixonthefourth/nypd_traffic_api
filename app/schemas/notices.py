@@ -1,7 +1,7 @@
 # app/schemas/notices.py
 from pydantic import BaseModel
 from datetime import datetime, date
-from typing import Literal
+from typing import Literal, List
 
 # ZIP Code Model
 class ViolationZipCode(BaseModel):
@@ -30,6 +30,37 @@ class NoticeBase(BaseModel):
 class CivilianNotice(NoticeBase):
     car: str
     address: str
+
+
+class DashboardOverview(BaseModel):
+    total_citations: int
+    active_citations: int
+    citations_this_month: int
+    total_drivers: int
+    officer_notices_past_month: int
+
+
+class DashboardCount(BaseModel):
+    label: str
+    count: int
+
+
+class DashboardNotice(BaseModel):
+    notice_id: str
+    violation_date_time: datetime
+    detachment: str
+    district: str
+    violation_severity: str
+    notice_status: str
+    violation_description: str
+
+
+class AdminDashboardStats(BaseModel):
+    overview: DashboardOverview
+    violation_counts: List[DashboardCount]
+    district_counts: List[DashboardCount]
+    detachment_counts: List[DashboardCount]
+    notices: List[DashboardNotice]
 
 # Notice Create Model
 class NoticeCreate(NoticeBase):

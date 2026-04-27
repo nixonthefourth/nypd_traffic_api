@@ -18,6 +18,25 @@ def get_connection():
 
 """GET"""
 
+# Get Officer Account by Badge Number
+def fetch_officer_by_badge(badge_number: str):
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    query = """
+    SELECT badge_number, last_name, first_name
+    FROM officer_info
+    WHERE badge_number = %s
+    """
+
+    cursor.execute(query, (badge_number,))
+    row = cursor.fetchone()
+
+    cursor.close()
+    conn.close()
+
+    return row
+
 # Get Civilian Account by Username or Email
 def fetch_civilian_by_login(login: str):
     conn = get_connection()
@@ -57,6 +76,26 @@ def civilian_account_exists(username: str, email: str, licence_number: str):
     conn.close()
 
     return row
+
+
+# Check if a Civilian Email Belongs to Another Driver
+def civilian_email_taken_by_other(email: str, driver_id: int):
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    query = """
+    SELECT 1
+    FROM driver_details
+    WHERE email = %s AND driver_id != %s
+    """
+
+    cursor.execute(query, (email, driver_id))
+    row = cursor.fetchone()
+
+    cursor.close()
+    conn.close()
+
+    return row is not None
 
 # Get Driver's Details by ID
 def fetch_driver_details(driver_id: int):
@@ -144,6 +183,140 @@ def fetch_driver_notices(driver_id: int):
 
     # Output Results
     return rows
+
+
+# Get Admin Dashboard Statistics
+def fetch_admin_dashboard_stats(badge_number: str, district=None, sort_order: str = "DESC"):
+    conn = get_connection()
+    cursor = conn.cursor()
+    sort_order = "ASC" if sort_order.upper() == "ASC" else "DESC"
+
+    try:
+        cursor.execute("SELECT COUNT(*) FROM notice_info")
+        total_citations = cursor.fetchone()[0]
+
+        cursor.execute(
+            """
+            SELECT COUNT(*)
+            FROM notice_info
+            WHERE notice_status = 'Active'
+            """
+        )
+        active_citations = cursor.fetchone()[0]
+
+        cursor.execute(
+            """
+            SELECT COUNT(*)
+            FROM notice_info
+            WHERE entry_date >= DATE_SUB(CURDATE(), INTERVAL 1 MONTH)
+            """
+        )
+        citations_this_month = cursor.fetchone()[0]
+
+        cursor.execute("SELECT COUNT(*) FROM driver_details")
+        total_drivers = cursor.fetchone()[0]
+
+        cursor.execute(
+            """
+            SELECT COUNT(DISTINCT notice_info.notice_id)
+            FROM notice_info
+            JOIN actions ON notice_info.notice_id = actions.notice_id
+            WHERE actions.badge_number = %s
+              AND notice_info.entry_date >= DATE_SUB(CURDATE(), INTERVAL 1 MONTH)
+            """,
+            (badge_number,)
+        )
+        officer_notices_past_month = cursor.fetchone()[0]
+
+        cursor.execute(
+            """
+            SELECT notice_info.violation_description, COUNT(*) AS notice_count
+            FROM notice_info
+            GROUP BY notice_info.violation_description
+            ORDER BY notice_count DESC, notice_info.violation_description ASC
+            """
+        )
+        violation_counts = cursor.fetchall()
+
+        cursor.execute(
+            """
+            SELECT violation_zip_code.district, COUNT(*) AS notice_count
+            FROM notice_info
+            JOIN violation_address ON notice_info.address_id = violation_address.address_id
+            JOIN violation_zip_code ON violation_address.zip_code = violation_zip_code.zip_code
+            GROUP BY violation_zip_code.district
+            ORDER BY notice_count DESC, violation_zip_code.district ASC
+            """
+        )
+        district_counts = cursor.fetchall()
+
+        cursor.execute(
+            """
+            SELECT DISTINCT notice_info.detachment
+            FROM notice_info
+            JOIN actions ON notice_info.notice_id = actions.notice_id
+            WHERE actions.badge_number = %s
+            """,
+            (badge_number,)
+        )
+        officer_detachments = [row[0] for row in cursor.fetchall()]
+
+        detachment_counts = []
+        if officer_detachments:
+            placeholders = ", ".join(["%s"] * len(officer_detachments))
+            cursor.execute(
+                f"""
+                SELECT detachment, COUNT(*) AS notice_count
+                FROM notice_info
+                WHERE detachment IN ({placeholders})
+                GROUP BY detachment
+                ORDER BY notice_count DESC, detachment ASC
+                """,
+                tuple(officer_detachments)
+            )
+            detachment_counts = cursor.fetchall()
+
+        notice_query = """
+            SELECT
+                notice_info.notice_id,
+                notice_info.violation_date_time,
+                notice_info.detachment,
+                violation_zip_code.district,
+                notice_info.violation_severity,
+                notice_info.notice_status,
+                notice_info.violation_description
+            FROM notice_info
+            JOIN violation_address ON notice_info.address_id = violation_address.address_id
+            JOIN violation_zip_code ON violation_address.zip_code = violation_zip_code.zip_code
+        """
+        notice_params = []
+
+        if district:
+            notice_query += " WHERE violation_zip_code.district = %s"
+            notice_params.append(district)
+
+        notice_query += f" ORDER BY notice_info.violation_date_time {sort_order}"
+
+        cursor.execute(notice_query, tuple(notice_params))
+        notices = cursor.fetchall()
+
+        return {
+            "overview": {
+                "total_citations": total_citations,
+                "active_citations": active_citations,
+                "citations_this_month": citations_this_month,
+                "total_drivers": total_drivers,
+                "officer_notices_past_month": officer_notices_past_month
+            },
+            "violation_counts": violation_counts,
+            "district_counts": district_counts,
+            "detachment_counts": detachment_counts,
+            "notices": notices
+        }
+
+    finally:
+        cursor.close()
+        conn.close()
 
 # Get All Drivers
 def fetch_all_drivers():
@@ -589,6 +762,43 @@ def update_civilian_password(driver_id: int, hashed_password: str):
         )
 
         conn.commit()
+
+    except Exception:
+        conn.rollback()
+        raise
+
+    finally:
+        cursor.close()
+        conn.close()
+
+
+# Update Civilian Contact Details
+def update_civilian_contact_details(driver_id: int, email: str, phone_number: str):
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    try:
+        cursor.execute(
+            "SELECT 1 FROM driver_details WHERE driver_id = %s",
+            (driver_id,)
+        )
+
+        if cursor.fetchone() is None:
+            return None
+
+        cursor.execute(
+            """
+            UPDATE driver_details
+            SET email = %s,
+                phone_number = %s
+            WHERE driver_id = %s
+            """,
+            (email, phone_number, driver_id)
+        )
+
+        conn.commit()
+
+        return fetch_driver_details(driver_id)
 
     except Exception:
         conn.rollback()

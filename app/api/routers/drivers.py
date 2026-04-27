@@ -4,7 +4,7 @@ from fastapi import HTTPException, APIRouter, status, Depends
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from app.database.db_raw import *
 from app.schemas.drivers import *
-from app.core.security import verify_token
+from app.core.security import require_admin, verify_token
 
 # Defines the Router
 drivers_router = APIRouter(
@@ -86,7 +86,7 @@ async def insert_new_driver(
     payload: DriverCreate,
     credentials: HTTPAuthorizationCredentials = Depends(security)
 ):
-    verify_token(credentials.credentials)
+    require_admin(verify_token(credentials.credentials))
 
     driver_id = create_driver(
         driver=payload,
@@ -117,7 +117,7 @@ async def remove_driver(
     driver_id: int,
     credentials: HTTPAuthorizationCredentials = Depends(security)
 ):
-    verify_token(credentials.credentials)
+    require_admin(verify_token(credentials.credentials))
 
     deleted = delete_driver(driver_id)
 
@@ -138,7 +138,7 @@ async def update_existing_driver(
     payload: DriverCreate,
     credentials: HTTPAuthorizationCredentials = Depends(security)
 ):
-    verify_token(credentials.credentials)
+    require_admin(verify_token(credentials.credentials))
 
     row = update_driver(driver_id, payload)
 

@@ -41,15 +41,33 @@ class CivilianResponse(BaseModel):
     weight_pounds: int
     eyes_colour: str
 
+
+class CivilianContactUpdateRequest(BaseModel):
+    email: str
+    phone_number: str
+
+
 class LoginRequest(BaseModel):
     username: str
     password: str
 
 
+class AdminLoginRequest(LoginRequest):
+    badge_number: str
+
+
 class TokenResponse(BaseModel):
     access_token: str
     token_type: str
+    role: str
 
 
 class CivilianTokenResponse(TokenResponse):
     driver_id: int
+
+
+class AdminTokenResponse(TokenResponse):
+    badge_number: str
+    username: str
+    first_name: str
+    last_name: str
